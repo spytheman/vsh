@@ -16,15 +16,13 @@
 import os { input, exec, user_os, join_path home_dir }
 import term.ui as tui
 import io
-import time
-
-// import v_history as vhist
 
 struct Vsh {
 mut:
 	tui           &tui.Context  = 0
 	cur           &Buffer       = 0
 	hist        	os.File
+	read        	os.File
 	magnet_x      int
 	viewport      int
 }
@@ -86,6 +84,7 @@ fn init(x voidptr) {
 fn (mut vsh Vsh) init_shell() {
 	vsh.cur = &Buffer{}
 	vsh.hist = os.open_append(os.join_path(os.home_dir(), '.v_history')) or { panic(err) }
+	vsh.read = os.open(os.join_path(os.home_dir(), '.v_history')) or { panic(err) }
 	vsh.cur.put('Welcome to v shell!')
 	vsh.cur.put('\nv# ')
 }
@@ -253,6 +252,7 @@ fn event(e &tui.Event, x voidptr) {
 	mut vsh := &Vsh(x)
 	mut buffer := vsh.cur
 	mut h := vsh.hist
+	mut r := vsh.read
 	// vsh.tui.write('\nv# "$e.utf8.bytes().hex()" = $e.utf8.bytes()')
 	vsh.tui.write('\nv# ')
 
@@ -296,11 +296,13 @@ fn event(e &tui.Event, x voidptr) {
 				buffer.move_cursor(1, .right)
 			}
 			.up {
-				mut history := io.new_buffered_reader(reader: io.make_reader(h))
+				mut history := io.new_buffered_reader(reader: io.make_reader(r))
+				defer { r.close() }
 				for {
 					l := history.read_line() or { break }
 					buffer.put('\nv# $l')
 				}
+				r.close()
 			}
 			.down {
 				buffer.put('\nv# hist fwd')
